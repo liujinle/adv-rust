@@ -1,0 +1,224 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- No storage/package permissions on purpose: APKs come through the system
+         document picker, and the client never queries host packages. -->
+
+    <!-- The guest shares the host UID, so every framework permission it touches
+         is checked against *this* manifest. Network is the first wall the guest
+         hits on startup: 红果 registers a CONNECTIVITY_CHANGE receiver and calls
+         ConnectivityManager.getActiveNetworkInfo(), which throws SecurityException
+         without ACCESS_NETWORK_STATE and kills the process. All three below are
+         normal permissions, granted at install time. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+
+    <!-- guest 已经在跑时"打开"要切回它那个任务而不是重建（normal 权限，装包即授予）。 -->
+    <uses-permission android:name="android.permission.REORDER_TASKS" />
+
+    <!--
+        usesCleartextTraffic 必须开着：明文 HTTP 策略是**进程级**的，由宿主 UID
+        的 manifest 决定，guest 自己 manifest 里的 usesCleartextTraffic 只在它
+        自己进程里生效。红果的短剧播放地址给的是 http CDN 地址，宿主 targetSdk 36
+        默认禁止明文 → 取地址/拉流全部失败，播放页只剩"网络错误，请稍后重试"。
+    -->
+    <!--
+        appComponentFactory 必须是自己的：系统重建组件（尤其是
+        `ActivityThread.handleReceiver`）时用的是宿主 ClassLoader，guest 的类名
+        在宿主 dex 里根本不存在 → ClassNotFoundException 直接把进程带走
+        （7.2.4.32 的 `to0.c`）。这里换成 GuestAppComponentFactory，让它在
+        宿主找不到类时回落到 guest 的 dex loader。
+    -->
+    <application
+        android:name=".AdvApplication"
+        android:allowBackup="false"
+        android:appComponentFactory="com.adv.bb.app.guest.GuestAppComponentFactory"
+        tools:replace="android:appComponentFactory"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:usesCleartextTraffic="true"
+        android:theme="@style/Theme.Adv">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:theme="@style/Theme.Adv"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Host entry for a virtual instance. Not exported: only the launcher
+             cascade inside the app may open it.
+
+             android:process=":guest" —— guest 运行时（DexClassLoader + 整套 hook）
+             必须跑在**独立进程**里：双账本原则下系统眼里仍然只有宿主一个 App
+             （同包、同 UID、同 dataDir），只是把「翻译层」关进一个可随时被杀的
+             进程。这样 guest 的 native 崩溃 / `Process.killProcess` / 静态单例污染
+             （Instrumentation、hidden API 豁免、进程名伪装）都不会再落到宿主 UI 上。
+
+             android:taskAffinity 与宿主不同 —— 独立的 recents 任务卡片，切回宿主
+             时两边的 Activity 栈互不干扰。 -->
+        <activity
+            android:name=".guest.GuestActivityProxy"
+            android:exported="false"
+            android:label="@string/app_name"
+            android:process=":guest"
+            android:taskAffinity="com.adv.bb.app.guest"
+            android:theme="@style/Theme.Adv.Guest"
+            android:windowSoftInputMode="adjustResize" />
+
+        <!-- 冷启动 gate：点「启动」后先开这一页把遮罩画出来，再由它去拉 guest。
+             任务是独立的（和 guest 一样 MULTIPLE_TASK），guest 起来后自己摘掉。
+             与 proxy 同进程/同 affinity：遮罩和 guest 窗口在同一个任务体系里；
+             excludeFromRecents 保证 recents 里只留 guest 那一张卡片。 -->
+        <activity
+            android:name=".guest.GuestLaunchActivity"
+            android:exported="false"
+            android:label="@string/app_name"
+            android:process=":guest"
+            android:taskAffinity="com.adv.bb.app.guest"
+            android:excludeFromRecents="true"
+            android:theme="@style/Theme.Adv"
+            android:windowSoftInputMode="adjustResize" />
+
+        <!-- 宿主 → :guest 的关机通道：先 finishAndRemoveTask 摘掉任务卡，再退出进程。
+             直接 killProcess 会被 AMS 立刻重建（详见 GuestProcess.shutdown 的注释）。
+             exported=false + 不声明 intent-filter：只接受同包显式广播。 -->
+        <receiver
+            android:name=".guest.GuestControlReceiver"
+            android:exported="false"
+            android:process=":guest" />
+
+        <!-- guest Service 的槽位代理池。guest 的 startService / bindService 由
+             IActivityManager 代理翻译成这里的某个组件（真身类名走 extra）。不声明
+             它们，AMS 对 guest 的服务组件只会回 `Unable to start service`，绑定方
+             永远等不到 onServiceConnected（哔哩哔哩「正在缓冲…0KB/s」）。
+
+             一个类只承载一个 guest Service —— AMS 按组件身份复用 ServiceRecord，
+             共享组件时第二个服务不会走 onCreate/onBind，stopService 还会误伤别的
+             服务（播放器每 8 秒 stop+bind 一次 IjkMediaPlayerLocalService）。 -->
+        <service android:name=".guest.GuestServiceProxy" android:exported="false" android:process=":guest" />
+        <service android:name=".guest.GuestServiceProxy$S1" android:exported="false" android:process=":guest" />
+        <service android:name=".guest.GuestServiceProxy$S2" android:exported="false" android:process=":guest" />
+        <service android:name=".guest.GuestServiceProxy$S3" android:exported="false" android:process=":guest" />
+        <service android:name=".guest.GuestServiceProxy$S4" android:exported="false" android:process=":guest" />
+        <service android:name=".guest.GuestServiceProxy$S5" android:exported="false" android:process=":guest" />
+        <service android:name=".guest.GuestServiceProxy$S6" android:exported="false" android:process=":guest" />
+        <service android:name=".guest.GuestServiceProxy$S7" android:exported="false" android:process=":guest" />
+        <service android:name=".guest.GuestServiceProxy$S8" android:exported="false" android:process=":guest" />
+        <service android:name=".guest.GuestServiceProxy$S9" android:exported="false" android:process=":guest" />
+        <service android:name=".guest.GuestServiceProxy$S10" android:exported="false" android:process=":guest" />
+        <service android:name=".guest.GuestServiceProxy$S11" android:exported="false" android:process=":guest" />
+
+        <!-- P1~P3：一个槽位进程只装一个 guest。P0 沿用上面的旧声明，避免升级后
+             已有任务卡、进程归属和恢复记录失效。池满时拒绝新启动，不淘汰活跃实例。 -->
+        <activity
+            android:name=".guest.GuestActivityProxy$P1"
+            android:exported="false"
+            android:label="@string/app_name"
+            android:process=":p1"
+            android:taskAffinity="com.adv.bb.app.guest.p1"
+            android:theme="@style/Theme.Adv.Guest"
+            android:windowSoftInputMode="adjustResize" />
+        <activity
+            android:name=".guest.GuestLaunchActivity$P1"
+            android:exported="false"
+            android:label="@string/app_name"
+            android:process=":p1"
+            android:taskAffinity="com.adv.bb.app.guest.p1"
+            android:excludeFromRecents="true"
+            android:theme="@style/Theme.Adv"
+            android:windowSoftInputMode="adjustResize" />
+        <receiver
+            android:name=".guest.GuestControlReceiver$P1"
+            android:exported="false"
+            android:process=":p1" />
+        <service android:name=".guest.GuestServiceProxyP1" android:exported="false" android:process=":p1" />
+        <service android:name=".guest.GuestServiceProxyP1$S1" android:exported="false" android:process=":p1" />
+        <service android:name=".guest.GuestServiceProxyP1$S2" android:exported="false" android:process=":p1" />
+        <service android:name=".guest.GuestServiceProxyP1$S3" android:exported="false" android:process=":p1" />
+        <service android:name=".guest.GuestServiceProxyP1$S4" android:exported="false" android:process=":p1" />
+        <service android:name=".guest.GuestServiceProxyP1$S5" android:exported="false" android:process=":p1" />
+        <service android:name=".guest.GuestServiceProxyP1$S6" android:exported="false" android:process=":p1" />
+        <service android:name=".guest.GuestServiceProxyP1$S7" android:exported="false" android:process=":p1" />
+        <service android:name=".guest.GuestServiceProxyP1$S8" android:exported="false" android:process=":p1" />
+        <service android:name=".guest.GuestServiceProxyP1$S9" android:exported="false" android:process=":p1" />
+        <service android:name=".guest.GuestServiceProxyP1$S10" android:exported="false" android:process=":p1" />
+        <service android:name=".guest.GuestServiceProxyP1$S11" android:exported="false" android:process=":p1" />
+
+        <activity
+            android:name=".guest.GuestActivityProxy$P2"
+            android:exported="false"
+            android:label="@string/app_name"
+            android:process=":p2"
+            android:taskAffinity="com.adv.bb.app.guest.p2"
+            android:theme="@style/Theme.Adv.Guest"
+            android:windowSoftInputMode="adjustResize" />
+        <activity
+            android:name=".guest.GuestLaunchActivity$P2"
+            android:exported="false"
+            android:label="@string/app_name"
+            android:process=":p2"
+            android:taskAffinity="com.adv.bb.app.guest.p2"
+            android:excludeFromRecents="true"
+            android:theme="@style/Theme.Adv"
+            android:windowSoftInputMode="adjustResize" />
+        <receiver
+            android:name=".guest.GuestControlReceiver$P2"
+            android:exported="false"
+            android:process=":p2" />
+        <service android:name=".guest.GuestServiceProxyP2" android:exported="false" android:process=":p2" />
+        <service android:name=".guest.GuestServiceProxyP2$S1" android:exported="false" android:process=":p2" />
+        <service android:name=".guest.GuestServiceProxyP2$S2" android:exported="false" android:process=":p2" />
+        <service android:name=".guest.GuestServiceProxyP2$S3" android:exported="false" android:process=":p2" />
+        <service android:name=".guest.GuestServiceProxyP2$S4" android:exported="false" android:process=":p2" />
+        <service android:name=".guest.GuestServiceProxyP2$S5" android:exported="false" android:process=":p2" />
+        <service android:name=".guest.GuestServiceProxyP2$S6" android:exported="false" android:process=":p2" />
+        <service android:name=".guest.GuestServiceProxyP2$S7" android:exported="false" android:process=":p2" />
+        <service android:name=".guest.GuestServiceProxyP2$S8" android:exported="false" android:process=":p2" />
+        <service android:name=".guest.GuestServiceProxyP2$S9" android:exported="false" android:process=":p2" />
+        <service android:name=".guest.GuestServiceProxyP2$S10" android:exported="false" android:process=":p2" />
+        <service android:name=".guest.GuestServiceProxyP2$S11" android:exported="false" android:process=":p2" />
+
+        <activity
+            android:name=".guest.GuestActivityProxy$P3"
+            android:exported="false"
+            android:label="@string/app_name"
+            android:process=":p3"
+            android:taskAffinity="com.adv.bb.app.guest.p3"
+            android:theme="@style/Theme.Adv.Guest"
+            android:windowSoftInputMode="adjustResize" />
+        <activity
+            android:name=".guest.GuestLaunchActivity$P3"
+            android:exported="false"
+            android:label="@string/app_name"
+            android:process=":p3"
+            android:taskAffinity="com.adv.bb.app.guest.p3"
+            android:excludeFromRecents="true"
+            android:theme="@style/Theme.Adv"
+            android:windowSoftInputMode="adjustResize" />
+        <receiver
+            android:name=".guest.GuestControlReceiver$P3"
+            android:exported="false"
+            android:process=":p3" />
+        <service android:name=".guest.GuestServiceProxyP3" android:exported="false" android:process=":p3" />
+        <service android:name=".guest.GuestServiceProxyP3$S1" android:exported="false" android:process=":p3" />
+        <service android:name=".guest.GuestServiceProxyP3$S2" android:exported="false" android:process=":p3" />
+        <service android:name=".guest.GuestServiceProxyP3$S3" android:exported="false" android:process=":p3" />
+        <service android:name=".guest.GuestServiceProxyP3$S4" android:exported="false" android:process=":p3" />
+        <service android:name=".guest.GuestServiceProxyP3$S5" android:exported="false" android:process=":p3" />
+        <service android:name=".guest.GuestServiceProxyP3$S6" android:exported="false" android:process=":p3" />
+        <service android:name=".guest.GuestServiceProxyP3$S7" android:exported="false" android:process=":p3" />
+        <service android:name=".guest.GuestServiceProxyP3$S8" android:exported="false" android:process=":p3" />
+        <service android:name=".guest.GuestServiceProxyP3$S9" android:exported="false" android:process=":p3" />
+        <service android:name=".guest.GuestServiceProxyP3$S10" android:exported="false" android:process=":p3" />
+        <service android:name=".guest.GuestServiceProxyP3$S11" android:exported="false" android:process=":p3" />
+    </application>
+
+</manifest>

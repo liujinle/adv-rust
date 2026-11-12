@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Library module only. The host application (L1) declares the launcher activity
+  and the proxy components the compatibility layer needs. Nothing here requests a
+  permission on its own: permissions are the host's decision and are documented in
+  docs/compatibility/matrix.md.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" />

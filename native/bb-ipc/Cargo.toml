@@ -1,0 +1,13 @@
+[package]
+name = "bb-ipc"
+description = "Binary message protocol between Kotlin and the native core."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+bb-common = { workspace = true }
+bb-config = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

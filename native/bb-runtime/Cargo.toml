@@ -1,0 +1,14 @@
+[package]
+name = "bb-runtime"
+description = "Virtual instance lifecycle state machine and registry."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+bb-common = { workspace = true }
+bb-config = { workspace = true }
+bb-storage = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

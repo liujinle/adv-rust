@@ -1,0 +1,11 @@
+[package]
+name = "bb-resource"
+description = "Instance resource cache with byte-budget accounting."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+bb-common = { workspace = true }
+serde = { workspace = true }

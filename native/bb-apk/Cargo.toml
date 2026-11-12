@@ -1,0 +1,17 @@
+[package]
+name = "bb-apk"
+description = "APK container and binary AndroidManifest.xml inspection (no Android dependency)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[features]
+# Enables deterministic in-memory APK fixtures so tests and benchmarks can
+# exercise the parser without shipping a binary blob in the repository.
+fixtures = []
+
+[dependencies]
+bb-common = { workspace = true }
+flate2 = { workspace = true }
+serde = { workspace = true }

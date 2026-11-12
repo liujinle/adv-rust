@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    debug-only manifest：命令行测试接口。
+
+    release 变体不会合并这个文件，所以 `com.adv.bb.DEBUG_CMD` 广播和
+    `DebugLaunchActivity` 在正式包里根本不存在。
+
+    - DebugCommandReceiver：查状态 / 读日志（广播，不打扰前台）
+    - DebugLaunchActivity：启动实例。必须走 Activity：Android 10+ 禁止后台
+      进程启动 Activity，广播到达时宿主通常不在前台，startActivity 会被丢弃。
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+
+        <receiver
+            android:name=".debug.DebugCommandReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.adv.bb.DEBUG_CMD" />
+            </intent-filter>
+        </receiver>
+
+        <activity
+            android:name=".debug.DebugLaunchActivity"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
+    </application>
+
+</manifest>

@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<resources>
+    <!-- Compose owns all colours; this theme only prevents a white/black flash
+         before the first frame. -->
+    <style name="Theme.Adv" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/adv_background</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+
+    <!--
+        代理 Activity 专用的启动主题。
+
+        `windowDisablePreview` 是这套冷启动方案的前提：guest 冷启动要 3~5 秒
+        （`Application.onCreate` 同步卡主线程），而系统启动窗口在这台 ROM 上只会画
+        底色、不画图标（`windowSplashScreenAnimatedIcon` 用矢量或 PNG 实测都不显示），
+        所以它就是一张白纸。关掉它，屏幕上留着的就是**下面那个任务**的窗口 —— 也就是
+        `GuestLaunchActivity` 已经画好的启动遮罩（见 GuestLaunchActivity 的说明）。
+    -->
+    <style name="Theme.Adv.Guest" parent="Theme.Adv">
+        <item name="android:windowSplashScreenBackground">@color/guest_launch_background</item>
+        <item name="android:windowDisablePreview">true</item>
+    </style>
+</resources>

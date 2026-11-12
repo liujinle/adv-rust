@@ -1,0 +1,12 @@
+[package]
+name = "bb-monitor"
+description = "Engine metrics: counters, gauges and latency histograms."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+bb-common = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

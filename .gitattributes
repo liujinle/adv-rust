@@ -1,0 +1,23 @@
+# 统一换行：源码里 LF 为主，Windows 侧脚本保留 CRLF。
+# 没有这个文件时 `git add` 会刷一堆 "LF will be replaced by CRLF" 警告，
+# 而且同一份文件在不同检出环境下 diff 会全红。
+* text=auto
+
+*.kt   text eol=lf
+*.java text eol=lf
+*.rs   text eol=lf
+*.toml text eol=lf
+*.md   text eol=lf
+*.xml  text eol=lf
+*.json text eol=lf
+*.ps1  text eol=crlf
+*.bat  text eol=crlf
+
+# 二进制，不要做任何换行/文本转换
+*.jar  binary
+*.so   binary
+*.a    binary
+*.apk  binary
+*.png  binary
+*.jpg  binary
+*.webp binary

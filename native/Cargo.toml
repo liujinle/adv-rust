@@ -1,0 +1,49 @@
+[workspace]
+resolver = "3"
+members = [
+    "bb-common",
+    "bb-config",
+    "bb-storage",
+    "bb-vfs",
+    "bb-ipc",
+    "bb-runtime",
+    "bb-scheduler",
+    "bb-apk",
+    "bb-resource",
+    "bb-monitor",
+    "bb-bridge",
+    "bb-bench",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "Apache-2.0"
+
+[workspace.dependencies]
+bb-common = { path = "bb-common" }
+bb-config = { path = "bb-config" }
+bb-storage = { path = "bb-storage" }
+bb-vfs = { path = "bb-vfs" }
+bb-ipc = { path = "bb-ipc" }
+bb-runtime = { path = "bb-runtime" }
+bb-scheduler = { path = "bb-scheduler" }
+bb-apk = { path = "bb-apk" }
+bb-resource = { path = "bb-resource" }
+bb-monitor = { path = "bb-monitor" }
+bb-bridge = { path = "bb-bridge" }
+
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+flate2 = "1.0"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+
+# `panic = "abort"` must never be enabled: the FFI boundary relies on
+# `catch_unwind` to keep Rust panics from crossing into Kotlin.
+[profile.dev]
+panic = "unwind"
+

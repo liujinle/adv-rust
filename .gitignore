@@ -1,0 +1,42 @@
+# Rust
+/native/target/
+**/*.rs.bk
+
+# Android / Gradle
+/android/.gradle/
+/android/build/
+/android/**/build/
+/android/local.properties
+/android/bbcore/src/main/jniLibs/
+*.apk
+*.aab
+*.keystore
+*.jks
+/android/app/release.keystore
+/dist/
+
+# CMake / NDK 构建产物（含 crashprobe 的 .o / build.ninja）
+/android/**/.cxx/
+
+# 交接文档：只在本地维护，不入库（含真机序列号、实例 ID、调试细节）
+/docs/HANDOFF.md
+
+# Local verification scratch
+/artifacts/
+*.log
+
+# 根目录临时产物：截图 / 抓取的日志 / 数据库快照 / 临时解包目录
+/tmp-*
+/s18.png
+/v1.png
+/cur
+/.tmp-dex/
+
+# JNI smoke test output
+/tests/jni/out/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
